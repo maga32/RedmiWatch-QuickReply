@@ -1,0 +1,147 @@
+<template>
+  <div>
+    <div class="main">
+      <div if="{{level === 0}}" class="w-100" style="margin-bottom: 20px;margin-top: 0px">
+        <div class="w-20">
+          <text class="font-40 text-center w-100" if="{{list && list.length !== 0}}" @click="routeDelete()">-</text>
+        </div>
+        <text class="font-40 text-center" style="flex: 1;">QuickReply</text>
+        <text class="font-40 text-center w-20" @click="developer()">@</text>
+      </div>
+      <div else class="w-100" style="margin-bottom: 20px;margin-top: 0px">
+        <text class="text-center w-20" @click="back()">&lt;</text>
+        <marquee id="marquee" scrollamount="20" style="width:80%">{{app}}</marquee>
+        <text class="w-20"></text>
+      </div>
+      <scroll class="w-100" style="flex-direction: column;flex: 1" scroll-y="{{true}}">
+        <div if="{{list && list.length === 0}}">
+          <text class="w-100 text-center" style="margin-top: 100px;">알림이 없습니다.</text>
+        </div>
+        <div if="{{list}}" class="w-100" style="flex-direction: column;">
+          <div class="item" for="item in list" @click="open(item)">
+            <text>{{level === 0 ? item.app : item.room || item.title}}</text>
+          </div>
+        </div>
+      </scroll>
+    </div>
+  </div>
+</template>
+
+<script>
+import router from '@system.router';
+import storage from '@system.storage';
+import file from '@system.file';
+import interconnect from '@system.interconnect';
+import prompt from '@system.prompt';
+
+export default {
+  data: { level: 0, packageName: '', app: '', list: null },
+  onInit() { this.level = Number(this.level); },
+  onShow() {
+    const connection = interconnect.instance();
+    connection.onmessage = message => this.receive(message, connection);
+    this.update();
+    // onopen에서도 상태 2가 반환되는 기기: 실제 연결 상태를 1초마다 확인한다.
+    const checkConnection = () => connection.getReadyState({
+      success: result => {
+        if (!this.connectionCheck) return;
+        if (result.status !== 1) return;
+        clearInterval(this.connectionCheck);
+        this.connectionCheck = null;
+        connection.send({
+          data: { list: true },
+          fail: value => console.error('목록 요청 실패: ' + JSON.stringify(value)),
+        });
+      },
+      fail: value => {
+        if (!this.connectionCheck) return;
+        clearInterval(this.connectionCheck);
+        this.connectionCheck = null;
+        console.error('연결 상태 확인 실패: ' + JSON.stringify(value));
+      },
+    });
+    this.connectionCheck = setInterval(checkConnection, 1000);
+    checkConnection();
+  },
+  onHide() {
+    clearInterval(this.connectionCheck);
+    this.connectionCheck = null;
+    interconnect.instance().onmessage = null;
+  },
+  // 응답 수신 → 방별 최신 20개 저장 → 이 화면 갱신 → 수신 확인.
+  receive({ data }, connection) {
+    const message = JSON.parse(data);
+    if (message.image && message.data !== undefined) return;
+    if (message.error) { prompt.showToast({ message: message.error }); return; }
+    const items = Array.isArray(message) ? message : [message];
+    const save = () => storage.get({
+      key: 'notices',
+      success: value => {
+        const seen = new Set(), rooms = new Map();
+        const notices = items.concat(JSON.parse(value || '[]')).sort((a, b) => b.time - a.time).filter(item => {
+          const id = item.id + ':' + item.time;
+          if (seen.has(id)) return false;
+          seen.add(id);
+          const room = JSON.stringify([item.packageName, item.room || item.title]);
+          const count = (rooms.get(room) || 0) + 1;
+          rooms.set(room, count);
+          return count <= 20;
+        });
+        storage.set({
+          key: 'notices', value: JSON.stringify(notices),
+          success: () => {
+            const images = new Set(notices.map(item => item.image));
+            for (const item of JSON.parse(value || '[]')) if (item.image && !images.has(item.image))
+              file.delete({ uri: 'internal://mass/quickreply/' + item.image + '.png' });
+            connection.send({ data: { received: items.map(item => item.id + ':' + item.time) } });
+            if (Array.isArray(message)) this.update();
+            else router.push({ uri: '/pages/reply' });
+          },
+          fail: (value, code) => console.error('알림 저장 실패: ' + code),
+        });
+      },
+      fail: (value, code) => console.error('알림 읽기 실패: ' + code),
+    });
+    if (Array.isArray(message)) save();
+    else storage.set({ key: 'selected', value: JSON.stringify(message), success: save });
+  },
+  // 앱 → 채팅방. 화면 목록도 저장소에서 직접 읽는다.
+  update() {
+    storage.get({
+      key: 'notices',
+      success: value => {
+        const notices = JSON.parse(value || '[]');
+        const groups = new Set();
+        this.list = notices.filter(item => {
+          if (this.level > 0 && item.packageName !== this.packageName) return false;
+          const key = this.level === 0 ? item.packageName : item.room || item.title;
+          if (groups.has(key)) return false;
+          groups.add(key);
+          return true;
+        });
+      },
+      fail: (value, code) => console.error('목록 읽기 실패: ' + code),
+    });
+  },
+  open(item) {
+    if (this.level === 1) {
+      storage.set({
+        key: 'selected', value: JSON.stringify(item),
+        success: () => router.push({ uri: '/pages/reply' }),
+      });
+    } else {
+      router.push({
+        uri: '/pages/index',
+        params: { level: 1, packageName: item.packageName, app: item.app },
+      });
+    }
+  },
+  back() { if (this.level) router.back(); },
+  routeDelete() { router.push({ uri: '/pages/delete' }); },
+  developer() { router.push({ uri: '/pages/developer' }); },
+};
+</script>
+
+<style>
+@import '../../common/common.css';
+</style>

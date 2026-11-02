@@ -1,0 +1,23 @@
+<template>
+  <div class="main">
+    <div class="w-100" style="margin-bottom: 20px;">
+      <text class="text-center w-20" @click="back()">&lt;</text>
+      <marquee scrollamount="20" style="flex: 1;">{{title}}</marquee>
+      <text class="w-20"></text>
+    </div>
+    <image src="{{src}}" style="width: 100%; flex: 1; object-fit: contain;" />
+  </div>
+</template>
+
+<script>
+import router from '@system.router';
+
+export default {
+  data: { src: '', title: '' },
+  back() { router.back(); },
+};
+</script>
+
+<style>
+@import '../../common/common.css';
+</style>

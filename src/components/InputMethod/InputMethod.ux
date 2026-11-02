@@ -1,0 +1,230 @@
+<template>
+  <div class="page" style="flex-direction: column;" show="{{!hide}}">
+    <div style="background-color:black" >
+      <div style="width: 100%;height: 255px;flex-direction: column">
+        <!-- 하단 자판부 -->
+        <div style="position:absolute;top:-11px;width:100%;height:276px;justify-content: center">
+          <progress percent="{{percent67}}" style="position:absolute;bottom: 12px;width:80px;color:#ffffff;stroke-width:6px;layer-color:#262626;"></progress>
+          <scroll id="keyboard67" scroll-x="{{true}}" onscroll="handelScroll">
+            <div if="{{numFlag}}" style="left: 6px; flex-direction: column;">
+              <div static style="margin-left: 0px;margin-top: 0px;height: 60px;">
+                <text class="calbtn67" for="{{item in keys['sign'][0]}}" @click="onSelect(item)">{{item}}</text>
+              </div>
+              <div static style="margin-left: 32px;margin-top: -5px;height: 60px;">
+                <text class="calbtn67" for="{{item in keys['sign'][1]}}" @click="onSelect(item)">{{item}}</text>
+              </div>
+              <div static style="margin-left: 64px;margin-top: -5px;height: 60px;">
+                <text class="calbtn67" for="{{item in keys['sign'][2]}}" @click="onSelect(item)">{{item}}</text>
+              </div>
+            </div>
+            <div if="{{!numFlag && lang==='en'}}" style="left: 6px; flex-direction: column;">
+              <div static style="margin-left: 0px;margin-top: 0px;height: 60px;">
+                <text class="calbtn67" for="{{item in keys['full'][0]}}" @click="onSelect(item)">{{item}}</text>
+              </div>
+              <div static style="margin-left: 32px;margin-top: -5px;height: 60px;">
+                <text class="calbtn67" for="{{item in keys['full'][1]}}" @click="onSelect(item)">{{item}}</text>
+              </div>
+              <div static style="margin-left: 64px;margin-top: -5px;height: 60px;">
+                <text class="calbtn67" for="{{item in keys['full'][2]}}" @click="onSelect(item)">{{item}}</text>
+                <img static src="./assets/space.png" style="width: 60px;height: 60px;" @click="onBtnClick('space')" />
+              </div>
+            </div>
+            <div if="{{!numFlag && lang==='ko'}}" style="left: 6px; flex-direction: column;">
+              <div static style="margin-left: 0px;margin-top: 0px;height: 60px;">
+                <text class="calbtn67" for="{{item in keys['ko'][upperFlag ? 3 : 0]}}" @click="onSelect(item)">{{item}}</text>
+              </div>
+              <div static style="margin-left: 32px;margin-top: -5px;height: 60px;">
+                <text class="calbtn67" for="{{item in keys['ko'][1]}}" @click="onSelect(item)">{{item}}</text>
+              </div>
+              <div static style="margin-left: 64px;margin-top: -5px;height: 60px;">
+                <text class="calbtn67" for="{{item in keys['ko'][2]}}" @click="onSelect(item)">{{item}}</text>
+                <img static src="./assets/space.png" style="width: 60px;height: 60px;" @click="onBtnClick('space')" />
+              </div>
+            </div>
+          </scroll>
+        </div>
+        <!-- 상단 설정부 -->
+        <div if="{{numFlag}}" style="width: 100%; flex-direction: row; justify-content: center; top:6px; padding:0 6px;">
+          <!-- Back to Keys -->
+          <img src="./assets/back2.png" style="margin-left: 6px;padding: 6px;width: 159px;height: 60px;" @click="onBtnClick('switchLang')" if="{{numFlag}}" />
+          <!-- Enter -->
+          <img src="./assets/enter.png" style="margin-left: 6px;padding: 6px;width: 94px;height: 60px;" @click="onBtnClick('E')" />
+          <!-- Del -->
+          <img src="./assets/del2.png" style="margin-left: 6px;padding: 6px;" @click="onBtnClick('D')" />
+        </div>
+        <div else style="width: 100%; flex-direction: row; justify-content: center; top:6px; padding:0 6px;">
+          <!-- Lang -->
+          <img src="./assets/ko.png" style="padding: 6px;width: 60px;height: 60px;" @click="onBtnClick('lang')" if="{{lang==='ko'}}" />
+          <img src="./assets/en.png" style="padding: 6px;width: 60px;height: 60px;" @click="onBtnClick('lang')" if="{{lang==='en'}}" />
+          <!-- Shift -->
+          <img src="./assets/a.png" style="padding: 6px;margin-left: 6px;width:94px;height:60px;" @click="onBtnClick('switchUpper')" if="{{!upperFlag}}" />
+          <img src="./assets/bigA.png" style="padding: 6px;margin-left: 6px;width:94px;height:60px;" @click="onBtnClick('switchLow')" if="{{upperFlag}}" />
+          <!-- Enter -->
+          <img src="./assets/enter.png" style="margin-left: 6px;padding: 6px;width: 94px;height: 60px;" @click="onBtnClick('E')" />
+          <!-- Num -->
+          <img src="./assets/123.png" style="margin-left: 6px;padding: 6px;width: 94px;height: 60px;" @click="onBtnClick('switchNum')" />
+          <!-- Del -->
+          <img src="./assets/del.png" style="margin-left: 6px;padding: 6px;width: 60px;height: 60px;" @click="onBtnClick('D')" />
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+import vibrator from "@system.vibrator";
+import device from '@system.device'
+
+export default {
+  props: {
+    hide: {
+      default: true,
+    },
+    vibratemode: {
+      default: "",
+    },
+  },
+  data: {
+    lang: "ko",
+    numFlag: false,
+    upperFlag: false,
+    percent67: 52,
+    // screenShape가 rect인 기기는 screenWidth를 자동으로 가져와 루트 div에 바인딩
+    // 이렇게 하면 n67, o65 및 후속 기기까지 동시에 지원 가능하나 실제 효과는 designWidth의 영향을 받을 수 있음
+    screenWidth: 336,
+    keys: {
+      full: [
+        ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P", "'", '"'],
+        ["A", "S", "D", "F", "G", "H", "J", "K", "L", ".", ","],
+        ["Z", "X", "C", "V", "B", "N", "M", "/", "?"],
+      ],
+      ko: [
+        ["ㅂ", "ㅈ", "ㄷ", "ㄱ", "ㅅ", "ㅛ", "ㅕ", "ㅑ", "ㅐ", "ㅔ", "'", '"'],
+        ["ㅁ", "ㄴ", "ㅇ", "ㄹ", "ㅎ", "ㅗ", "ㅓ", "ㅏ", "ㅣ", ".", ","],
+        ["ㅋ", "ㅌ", "ㅊ", "ㅍ", "ㅠ", "ㅜ", "ㅡ", "/", "?"],
+        ["ㅃ", "ㅉ", "ㄸ", "ㄲ", "ㅆ", "ㅛ", "ㅕ", "ㅑ", "ㅒ", "ㅖ", "'", '"'],
+      ],
+      sign: [
+        ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "{", "}", "`"],
+        ["!", "@", "#", "$", "%", "^", "&", "*", "(", ")", "[", "]"],
+        ["~", ";", ":", "-", "_", "=", "+", "<", ">", "\\", "|"],
+      ],
+    },
+  },
+  onInit() {
+    this.adjustScreenWidth();
+    this.$watch("hide", "watchHidePropsChange");
+  },
+  addAllTxt(txt) {
+    // 문자
+    this.$emit("complete", { content: txt });
+  },
+  onRsSelect(txt) {
+    this.onVibrate();
+    this.addAllTxt(txt);
+  },
+  onBtnClick(sign) {
+    this.onVibrate();
+    switch (sign) {
+      case "lang":
+        if (this.lang === "ko") {
+          this.lang = "en";
+        } else if (this.lang === "en") {
+          this.lang = "ko";
+        }
+        break;
+      case "D":
+        // 삭제
+        this.$emit("delete", {});
+        break;
+      case "E":
+        // 엔터
+        this.$emit("enter", {});
+        break;
+      case "space":
+        this.addAllTxt(" ");
+        break;
+      case "switchNum":
+        this.numFlag = true;
+        break;
+      case "switchLang":
+        this.numFlag = false;
+        break;
+      case "switchUpper":
+        this.upperFlag = true;
+        break;
+      case "switchLow":
+        this.upperFlag = false;
+        break;
+      default:
+        this.addAllTxt(sign);
+        break;
+    }
+  },
+  onSelect(num) {
+    // 키입력신호
+    this.$emit("keyDown", { content: num });
+    this.onVibrate();
+    if (this.lang === "en" && !this.numFlag) {
+      if (this.upperFlag) {
+        this.addAllTxt(num.toUpperCase());
+      } else {
+        this.addAllTxt(num.toLowerCase());
+      }
+    } else {
+      this.addAllTxt(num);
+    }
+  },
+  watchHidePropsChange(newV, oldV) {
+    // 숨기기상태추
+    this.$emit("visibilityChange", { visible: newV });
+  },
+  onVibrate() {
+    if (this.vibratemode != "") {
+      vibrator.vibrate({ mode: this.vibratemode });
+    }
+  },
+  handelScroll(event) {
+    let percentTemp67 = (event.scrollX / 636) * 100 + 52.8;
+    this.percent67 = parseInt(percentTemp67 <= 100 ? percentTemp67 : 100);
+  },
+  adjustScreenWidth(){
+    device.getInfo({
+      success: (data) => {
+        this.screenWidth = data.screenWidth;
+      }
+    })
+  }
+};
+</script>
+
+<style>
+text { font-family: "MiSans-Medium" }
+
+.page {
+	width:100%;
+	position:absolute;
+	left:0;
+	bottom:0
+}
+.calbtn67 {
+	color:rgb(255,255,255);
+	font-size:32px;
+	font-weight:bold;
+	background-color:rgb(38,38,38);
+	margin-right:4px;
+	width:60px;
+	height:60px;
+	border-radius:30px;
+	text-align:center;
+	border:3px solid rgba(255,255,255,0.06);
+}
+
+#keyboard67 {
+	position:absolute;
+	left:0px;
+	top:82px;
+	width:100%;
+	height:170px;
+}
+</style>

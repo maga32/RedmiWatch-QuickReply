@@ -1,0 +1,198 @@
+<import name="input-method" src="../../components/InputMethod/InputMethod.ux"></import>
+<template>
+  <div>
+    <div class="main">
+      <div class="w-100" style="margin-bottom: 20px;margin-top: 0px">
+        <text class="text-center w-20" @click="back()">&lt;</text>
+        <marquee id="marquee" scrollamount="20" style="width:80%">{{notice ? notice.room || notice.title : '답장하기'}}</marquee>
+        <text class="w-20"></text>
+      </div>
+      <scroll id="chatView" class="w-100" style="flex-direction: column;flex: 1" scroll-y="{{true}}" @click="hideKeyboard">
+        <div for="item in list" class="br w-100" @click="select(item)">
+          <div class="nickNames br">
+            <text class="font-20 chatMessages {{item.mine ? 'text-salmon' : ''}}">{{item.mine ? '나' : item.title}}</text>
+          </div>
+          <div class="bubble chatMessages btn-secondary br {{notice && item.id === notice.id && item.time === notice.time ? 'selected' : ''}}">
+            <text class="font-20 w-100">{{item.text + '　'.repeat(item.text.length / 14)}}</text>
+            <image if="{{item.image && images[item.image]}}" src="{{images[item.image]}}" style="width: 100%; height: 300px; object-fit: contain;" />
+          </div>
+        </div>
+      </scroll>
+      <div class="w-100" style="margin:0 30px; display: flex;flex-direction: column;">
+        <div class="messageBox" @click="showKeyboard">
+          <text id="chatMessage" class="font-20">{{textOutput.slice(-16)}}_</text>
+        </div>
+        <div if="{{!hide}}" style="height: 220px;"></div>
+      </div>
+    </div>
+    <input-method style="width:100%" hide="{{hide}}" vibratemode="short"
+      @enter="onEnter" @delete="onDelete" @complete="onComplete"></input-method>
+  </div>
+</template>
+
+<script>
+import { assemble } from 'es-hangul';
+import router from '@system.router';
+import storage from '@system.storage';
+import interconnect from '@system.interconnect';
+import prompt from '@system.prompt';
+import file from '@system.file';
+
+export default {
+  data: { notice: null, list: [], textValue: '', hide: true, images: {} },
+  computed: {
+    textOutput() { return this.textValue ? assemble([this.textValue]) : ''; },
+  },
+  onShow() {
+    const connection = interconnect.instance();
+    connection.onmessage = message => this.receive(message, connection);
+    this.update();
+  },
+  onHide() { interconnect.instance().onmessage = null; this.imageTransfer = null; },
+  // 직접 열린 답장 화면도 수신·저장 완료 후 바로 갱신한다.
+  receive({ data }, connection) {
+    const message = JSON.parse(data);
+    if (message.error) { this.imageTransfer = null; prompt.showToast({ message: message.error }); return; }
+    if (message.image && message.data !== undefined) { this.receiveImage(message); return; }
+    const items = Array.isArray(message) ? message : [message];
+    if (items.some(item => item.mine && this.notice && item.id === this.notice.id
+        && item.text === this.textOutput)) this.textValue = '';
+    const save = () => storage.get({
+      key: 'notices',
+      success: value => {
+        const seen = new Set(), rooms = new Map();
+        const notices = items.concat(JSON.parse(value || '[]')).sort((a, b) => b.time - a.time).filter(item => {
+          const id = item.id + ':' + item.time;
+          if (seen.has(id)) return false;
+          seen.add(id);
+          const room = JSON.stringify([item.packageName, item.room || item.title]);
+          const count = (rooms.get(room) || 0) + 1;
+          rooms.set(room, count);
+          return count <= 20;
+        });
+        storage.set({
+          key: 'notices', value: JSON.stringify(notices),
+          success: () => {
+            const images = new Set(notices.map(item => item.image));
+            for (const item of JSON.parse(value || '[]')) if (item.image && !images.has(item.image))
+              file.delete({ uri: 'internal://mass/quickreply/' + item.image + '.png' });
+            this.update();
+            connection.send({ data: { received: items.map(item => item.id + ':' + item.time) } });
+          },
+          fail: (value, code) => console.error('알림 저장 실패: ' + code),
+        });
+      },
+      fail: (value, code) => console.error('알림 읽기 실패: ' + code),
+    });
+    if (Array.isArray(message)) save();
+    else storage.set({ key: 'selected', value: JSON.stringify(message), success: save });
+  },
+  update() {
+    storage.get({
+      key: 'selected',
+      success: value => {
+        const selected = JSON.parse(value || 'null');
+        this.notice = selected;
+        storage.get({ key: 'notices', success: value => {
+          const notices = JSON.parse(value || '[]');
+          const list = selected ? notices.filter(item =>
+            item.packageName === selected.packageName && (item.room || item.title) === (selected.room || selected.title)).reverse() : [];
+          if (JSON.stringify(this.list) === JSON.stringify(list)) { this.loadImages(); return; }
+          this.list = list;
+          this.loadImages();
+          this.scrollUpdate();
+        } });
+      },
+      fail: (value, code) => console.error('선택 알림 읽기 실패: ' + code),
+    });
+  },
+  // 대화에 필요한 사진만 순서대로 요청한다. 저장된 파일은 다시 받지 않는다.
+  loadImages() {
+    if (this.imageTransfer) return;
+    const item = this.list.find(item => item.image && !this.images[item.image]);
+    if (!item) return;
+    const transfer = { image: item.image, offset: 0, data: '', uri: 'internal://mass/quickreply/' + item.image + '.png' };
+    this.imageTransfer = transfer;
+    file.get({ uri: transfer.uri,
+      success: () => this.showImage(transfer),
+      fail: (error, code) => {
+        if (this.imageTransfer !== transfer) return;
+        if (code === 301) this.requestImage();
+        else { this.imageTransfer = null; prompt.showToast({ message: '사진 파일 확인 실패: ' + code }); }
+      },
+    });
+  },
+  showImage(transfer) {
+    if (this.imageTransfer !== transfer) return;
+    this.images = { ...this.images, [transfer.image]: transfer.uri };
+    this.imageTransfer = null;
+    this.scrollUpdate();
+    this.loadImages();
+  },
+  requestImage() {
+    const { image, offset } = this.imageTransfer;
+    interconnect.instance().send({ data: { image, offset },
+      fail: () => { this.imageTransfer = null; prompt.showToast({ message: '사진 요청 실패' }); },
+    });
+  },
+  receiveImage(message) {
+    const transfer = this.imageTransfer;
+    if (!transfer || message.image !== transfer.image || message.offset !== transfer.offset) return;
+    transfer.data += message.data;
+    transfer.offset = message.next;
+    if (!message.end) { this.requestImage(); return; }
+    // Noti와 같은 Base64 → Uint8Array → 이미지 파일 저장.
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+    const buffer = new Uint8Array(transfer.offset);
+    let bits = 0, count = 0, offset = 0;
+    for (const character of transfer.data) {
+      if (character === '=') break;
+      bits = (bits << 6) | alphabet.indexOf(character);
+      count += 6;
+      if (count >= 8) { count -= 8; buffer[offset++] = (bits >> count) & 255; }
+    }
+    file.writeArrayBuffer({ uri: transfer.uri, buffer,
+      success: () => this.showImage(transfer),
+      fail: (error, code) => { this.imageTransfer = null; prompt.showToast({ message: '사진 저장 실패: ' + code }); },
+    });
+  },
+  select(item) {
+    storage.set({ key: 'selected', value: JSON.stringify(item), success: () => {
+      this.update();
+      if (item.image && this.images[item.image]) router.push({ uri: '/pages/viewer',
+        params: { src: this.images[item.image], title: item.room || item.title },
+      });
+    } });
+  },
+  back() { router.back(); },
+  // 심플챗처럼 목록·키보드 배치 반영 후 최신 메시지까지 스크롤한다.
+  scrollUpdate() {
+    setTimeout(() => this.$element('chatView').scrollTo({ top: 999999, behavior: 'smooth' }), 100);
+  },
+  showKeyboard() { this.hide = false; this.scrollUpdate(); },
+  hideKeyboard() { this.hide = true; this.scrollUpdate(); },
+  onEnter() {
+    if (!this.notice || !this.textOutput.trim()) return;
+    interconnect.instance().send({
+      data: { reply: { ...this.notice, text: this.textOutput, time: Date.now() } },
+      fail: () => prompt.showToast({ message: '휴대폰으로 답장 요청을 보내지 못했습니다.' }),
+    });
+  },
+  onDelete() { this.textValue = this.textValue.slice(0, -1); },
+  onComplete(event) { this.textValue += event.detail.content; },
+};
+</script>
+
+<style>
+@import '../../common/common.css';
+.messageBox {
+  background-color: rgba(51, 45, 45, 0.9);
+  border-radius: 10px;
+  border: solid 3px 0 0 0 black;
+  padding: 8px;
+}
+.nickNames { width: 115px; }
+.chatMessages { padding: 10px; border-radius: 10px; }
+.bubble { flex: 1; flex-direction: column; }
+.selected { background-color: #67402f; }
+</style>

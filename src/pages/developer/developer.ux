@@ -1,0 +1,35 @@
+<template>
+  <div class="main">
+    <div class="w-100" style="margin-bottom: 20px;">
+      <text class="text-center w-20" @click="back()">&lt;</text>
+      <text class="text-center" style="flex: 1;">Developer</text>
+      <text class="w-20"></text>
+    </div>
+    <scroll class="w-100" style="flex-direction: column; flex: 1;" scroll-y="{{true}}">
+      <text class="br">Developer.</text>
+      <text class="br">SeungHwa</text>
+      <text class="br"></text>
+
+      <text class="br">QuickReply app info.</text>
+      <qrcode class="br" value="https://github.com/maga32/RedmiWatch-QuickReply"></qrcode>
+      <text class="br font-20 w-100">https://github.com/maga32/RedmiWatch-QuickReply</text>
+      <text class="br"></text>
+
+      <text class="br">Developer site.</text>
+      <qrcode class="br" value="https://sung-a.duckdns.org"></qrcode>
+      <text class="br font-20 w-100">https://sung-a.duckdns.org</text>
+    </scroll>
+  </div>
+</template>
+
+<script>
+import router from '@system.router';
+
+export default {
+  back() { router.back(); },
+};
+</script>
+
+<style>
+@import '../../common/common.css';
+</style>

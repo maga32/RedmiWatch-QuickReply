@@ -1,0 +1,65 @@
+<template>
+  <div class="main">
+    <div style="width: 100%;margin-bottom: 20px;margin-top: 0px">
+      <text class="font-40" style="width:20%; text-align: center" @click="back()">x</text>
+      <text class="font-40" style="flex: 1; text-align: center">QuickReply</text>
+      <text class="font-40" style="width:20%; text-align: center" @click="save()">o</text>
+    </div>
+    <scroll style="flex-direction: column;width: 100%;flex: 1" scroll-y="{{true}}">
+      <div if="{{list.length === 0}}">
+        <text style="width: 100%;margin-top: 100px;text-align: center">알림이 없습니다.</text>
+      </div>
+      <div else for="(i, item) in list">
+        <text class="delete" @click="deleteList(i)">-</text>
+        <text class="item">{{item.app}}</text>
+      </div>
+    </scroll>
+  </div>
+</template>
+
+<script>
+import router from '@system.router';
+import storage from '@system.storage';
+import file from '@system.file';
+
+export default {
+  data: { list: [], notices: [] },
+  onInit() {
+    storage.get({ key: 'notices', success: value => {
+      const notices = JSON.parse(value || '[]');
+      this.notices = notices;
+      const apps = new Set();
+      this.list = notices.filter(item => {
+        if (apps.has(item.packageName)) return false;
+        apps.add(item.packageName);
+        return true;
+      });
+    } });
+  },
+  deleteList(index) { this.list.splice(index, 1); },
+  back() { router.back(); },
+  save() {
+    const apps = new Set(this.list.map(item => item.packageName));
+    const removed = new Set(this.notices.filter(item => !apps.has(item.packageName)).map(item => item.id + ':' + item.time));
+    storage.get({ key: 'notices', success: value => storage.set({
+      key: 'notices',
+      value: JSON.stringify(JSON.parse(value || '[]').filter(item => !removed.has(item.id + ':' + item.time))),
+      success: () => {
+        for (const item of JSON.parse(value || '[]')) if (item.image && removed.has(item.id + ':' + item.time))
+          file.delete({ uri: 'internal://mass/quickreply/' + item.image + '.png' });
+        router.back();
+      },
+    }) });
+  },
+};
+</script>
+
+<style>
+@import '../../common/common.css';
+.delete {
+  background-color: red;
+  border-radius: 80px;
+  margin: 0 10px 20px;
+  padding: 10px 30px;
+}
+</style>

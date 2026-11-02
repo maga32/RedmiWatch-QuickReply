@@ -1,0 +1,44 @@
+{
+  "package": "org.duckdns.sunga.quickreply",
+  "name": "QuickReply",
+  "versionName": "1.0.0",
+  "versionCode": 1,
+  "minPlatformVersion": 1000,
+  "icon": "/common/logo.png",
+  "deviceTypeList": [
+    "watch"
+  ],
+  "features": [
+    {"name": "system.file"},
+    {"name": "system.prompt"},
+    {"name": "system.storage"},
+    {"name": "system.router"},
+    {"name": "system.vibrator"},
+    {"name": "system.device"},
+    {"name": "system.interconnect"}
+  ],
+  "config": {
+    "logLevel": "log",
+    "designWidth": "device-width"
+  },
+  "router": {
+    "entry": "pages/index",
+    "pages": {
+      "pages/index": {
+        "component": "index"
+      },
+      "pages/reply": {
+        "component": "reply"
+      },
+      "pages/viewer": {
+        "component": "viewer"
+      },
+      "pages/developer": {
+        "component": "developer"
+      },
+      "pages/delete": {
+        "component": "delete"
+      }
+    }
+  }
+}
