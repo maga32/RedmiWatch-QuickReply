@@ -23,6 +23,7 @@
           </div>
         </div>
       </scroll>
+      <text if="{{noticeText}}" class="notice btn btn-gray text-center font-20 w-75">{{noticeText}}</text>
     </div>
   </div>
 </template>
@@ -32,10 +33,9 @@ import router from '@system.router';
 import storage from '@system.storage';
 import file from '@system.file';
 import interconnect from '@system.interconnect';
-import prompt from '@system.prompt';
 
 export default {
-  data: { level: 0, packageName: '', app: '', list: null },
+  data: { level: 0, packageName: '', app: '', list: null, noticeText: '' },
   onInit() { this.level = Number(this.level); },
   onShow() {
     const connection = interconnect.instance();
@@ -64,6 +64,8 @@ export default {
     checkConnection();
   },
   onHide() {
+    clearTimeout(this.noticeTimer);
+    this.noticeText = '';
     clearInterval(this.connectionCheck);
     this.connectionCheck = null;
     interconnect.instance().onmessage = null;
@@ -72,7 +74,7 @@ export default {
   receive({ data }, connection) {
     const message = JSON.parse(data);
     if (message.image && message.data !== undefined) return;
-    if (message.error) { prompt.showToast({ message: message.error }); return; }
+    if (message.error) { this.showNotice(message.error); return; }
     const items = Array.isArray(message) ? message : [message];
     const save = () => storage.get({
       key: 'notices',
@@ -137,6 +139,11 @@ export default {
     }
   },
   back() { if (this.level) router.back(); },
+  showNotice(text) {
+    clearTimeout(this.noticeTimer);
+    this.noticeText = text;
+    this.noticeTimer = setTimeout(() => { this.noticeText = ''; }, 4000);
+  },
   routeDelete() { router.push({ uri: '/pages/delete' }); },
   developer() { router.push({ uri: '/pages/developer' }); },
 };

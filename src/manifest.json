@@ -10,7 +10,6 @@
   ],
   "features": [
     {"name": "system.file"},
-    {"name": "system.prompt"},
     {"name": "system.storage"},
     {"name": "system.router"},
     {"name": "system.vibrator"},

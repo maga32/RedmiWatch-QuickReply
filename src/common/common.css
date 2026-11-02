@@ -1,3 +1,5 @@
+.notice { position: absolute; }
+
 .main {
     flex-direction: column;
     justify-content: center;
@@ -19,6 +21,7 @@
   
   text, marquee {
     font-family: "MiSans-Medium";
+    font-weight: "bold";
     color: white;
   }
   
@@ -29,10 +32,10 @@
   .text-white { color: white; }
   
   .btn {
-      border-radius:18px;
+    border-radius:18px;
     padding: 8px;
     margin: 4px;
-      border:3px solid rgba(255,255,255,0.06);
+    border:3px solid rgba(255,255,255,0.06);
   }
   
   .btn-secondary {

@@ -24,6 +24,7 @@
         </div>
         <div if="{{!hide}}" style="height: 220px;"></div>
       </div>
+      <text if="{{noticeText}}" class="notice btn btn-gray text-center font-20 w-75">{{noticeText}}</text>
     </div>
     <input-method style="width:100%" hide="{{hide}}" vibratemode="short"
       @enter="onEnter" @delete="onDelete" @complete="onComplete"></input-method>
@@ -35,11 +36,10 @@ import { assemble } from 'es-hangul';
 import router from '@system.router';
 import storage from '@system.storage';
 import interconnect from '@system.interconnect';
-import prompt from '@system.prompt';
 import file from '@system.file';
 
 export default {
-  data: { notice: null, list: [], textValue: '', hide: true, images: {} },
+  data: { notice: null, list: [], textValue: '', hide: true, images: {}, noticeText: '' },
   computed: {
     textOutput() { return this.textValue ? assemble([this.textValue]) : ''; },
   },
@@ -48,11 +48,16 @@ export default {
     connection.onmessage = message => this.receive(message, connection);
     this.update();
   },
-  onHide() { interconnect.instance().onmessage = null; this.imageTransfer = null; },
+  onHide() {
+    clearTimeout(this.noticeTimer);
+    this.noticeText = '';
+    interconnect.instance().onmessage = null;
+    this.imageTransfer = null;
+  },
   // 직접 열린 답장 화면도 수신·저장 완료 후 바로 갱신한다.
   receive({ data }, connection) {
     const message = JSON.parse(data);
-    if (message.error) { this.imageTransfer = null; prompt.showToast({ message: message.error }); return; }
+    if (message.error) { this.imageTransfer = null; this.showNotice(message.error); return; }
     if (message.image && message.data !== undefined) { this.receiveImage(message); return; }
     const items = Array.isArray(message) ? message : [message];
     if (items.some(item => item.mine && this.notice && item.id === this.notice.id
@@ -115,10 +120,9 @@ export default {
     this.imageTransfer = transfer;
     file.get({ uri: transfer.uri,
       success: () => this.showImage(transfer),
-      fail: (error, code) => {
+      fail: () => {
         if (this.imageTransfer !== transfer) return;
-        if (code === 301) this.requestImage();
-        else { this.imageTransfer = null; prompt.showToast({ message: '사진 파일 확인 실패: ' + code }); }
+        this.requestImage();
       },
     });
   },
@@ -132,7 +136,7 @@ export default {
   requestImage() {
     const { image, offset } = this.imageTransfer;
     interconnect.instance().send({ data: { image, offset },
-      fail: () => { this.imageTransfer = null; prompt.showToast({ message: '사진 요청 실패' }); },
+      fail: () => { this.imageTransfer = null; this.showNotice('사진 요청 실패'); },
     });
   },
   receiveImage(message) {
@@ -153,7 +157,7 @@ export default {
     }
     file.writeArrayBuffer({ uri: transfer.uri, buffer,
       success: () => this.showImage(transfer),
-      fail: (error, code) => { this.imageTransfer = null; prompt.showToast({ message: '사진 저장 실패: ' + code }); },
+      fail: (error, code) => { this.imageTransfer = null; this.showNotice('사진 저장 실패: ' + code); },
     });
   },
   select(item) {
@@ -165,6 +169,12 @@ export default {
     } });
   },
   back() { router.back(); },
+  // 심플챗의 notice처럼 화면 안에 잠시 표시한다.
+  showNotice(text) {
+    clearTimeout(this.noticeTimer);
+    this.noticeText = text;
+    this.noticeTimer = setTimeout(() => { this.noticeText = ''; }, 4000);
+  },
   // 심플챗처럼 목록·키보드 배치 반영 후 최신 메시지까지 스크롤한다.
   scrollUpdate() {
     setTimeout(() => this.$element('chatView').scrollTo({ top: 999999, behavior: 'smooth' }), 100);
@@ -175,7 +185,7 @@ export default {
     if (!this.notice || !this.textOutput.trim()) return;
     interconnect.instance().send({
       data: { reply: { ...this.notice, text: this.textOutput, time: Date.now() } },
-      fail: () => prompt.showToast({ message: '휴대폰으로 답장 요청을 보내지 못했습니다.' }),
+      fail: () => this.showNotice('답장 요청 실패'),
     });
   },
   onDelete() { this.textValue = this.textValue.slice(0, -1); },
